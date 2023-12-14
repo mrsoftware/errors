@@ -1,0 +1,5 @@
+/.idea/
+/bin/
+/.coverage.txt
+.DS_Store
+cover.cov
