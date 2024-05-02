@@ -17,7 +17,7 @@ func TestTakeStacktrace(t *testing.T) {
 	assert.Contains(
 		t,
 		lines[0],
-		"gitlab.snapp.ir/pricing/zeus/pkg/errorsv2.TestTakeStacktrace",
+		"github.com/mrsoftware/errors.TestTakeStacktrace",
 		"Expected stacktrace to start with the test.",
 	)
 }
@@ -52,7 +52,7 @@ func TestTakeStacktraceWithSkipInnerFunc(t *testing.T) {
 func TestTakeStacktraceDeepStack(t *testing.T) {
 	const (
 		N                  = 500
-		withStackDepthName = "gitlab.snapp.ir/pricing/zeus/pkg/errorsv2.withStackDepth"
+		withStackDepthName = "github.com/mrsoftware/errors.withStackDepth"
 	)
 	withStackDepth(N, func() {
 		trace := takeStacktrace(0)
