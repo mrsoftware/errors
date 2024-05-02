@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Error is internal error with fields capabilities.
+// Error is an internal error with fields capabilities.
 type Error struct {
 	cause  error
 	msg    string
@@ -17,12 +17,12 @@ func New(msg string, fields ...Field) error {
 	return &Error{msg: msg, fields: fields}
 }
 
-// Wrap create new error with given cause.
+// Wrap creates a new error with given cause.
 func Wrap(cause error, msg string, fields ...Field) error {
 	return &Error{cause: cause, msg: msg, fields: fields}
 }
 
-// Wrapf is like Wrap but it does format.
+// Wrapf is like Wrap, but it does format.
 func Wrapf(cause error, format string, args ...interface{}) error {
 	return Wrap(cause, fmt.Sprintf(format, args...))
 }
@@ -56,9 +56,10 @@ func (e *Error) Unwrap() error { return e.cause }
 
 // GetError check if the error is Error, create an empty Error if not.
 func GetError(err error) (Err *Error) {
-	Err, ok := err.(*Error)
+	var custom *Error
+	ok := errors.As(err, &custom)
 	if ok {
-		return Err
+		return custom
 	}
 
 	if unwrapped := errors.Unwrap(err); unwrapped != nil {
@@ -96,13 +97,6 @@ func Cause(err error) error {
 
 // Format is implement the fmt.Formatter for Error.
 func (e *Error) Format(state fmt.State, verb rune) {
-
-	for _, v := range e.fields {
-		v.Format(state, verb)
-		break
-	}
-
-	return
 	switch verb {
 	case 'v':
 		if state.Flag('+') {
@@ -111,31 +105,22 @@ func (e *Error) Format(state fmt.State, verb rune) {
 			return
 		}
 
-		fallthrough
+		if state.Flag('#') {
+			fmt.Fprintf(state, "%v: %#v", e.Error(), e.fields)
+
+			return
+		}
+
+		fmt.Fprintf(state, "%v: %v", e.Error(), e.fields)
 	case 's':
-		// io.WriteString(state, e.Error())
 		fmt.Fprintf(state, "%s: %s", e.Error(), e.fields)
 	case 'q':
-		fmt.Fprintf(state, "%q", e.Error())
+		fmt.Fprintf(state, "%q: %q", e.Error(), e.fields)
 	}
 }
 
-// func (e *Error) formatFields(state fmt.State, verb rune) {
-// 	if verb != 'v' {
-// 		return
-// 	}
-//
-// 	if !state.Flag('+') {
-// 		return
-// 	}
-//
-// 	for _, field := range GetChainFields(e) {
-// 		fmt.Fprintf(state, "[%+v]", field)
-// 	}
-// }
-
 // AddFields to the passed error.
-// passed error must be Error, if not, a new Error will created.
+// passed error must be Error, if not, a new Error will create.
 func AddFields(err error, fields ...Field) error {
 	customError := GetError(err)
 	customError.fields = append(customError.fields, fields...)

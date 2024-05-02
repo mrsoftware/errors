@@ -3,7 +3,6 @@ package errors
 import (
 	"context"
 	"fmt"
-	"io"
 	"math"
 	"time"
 )
@@ -13,7 +12,7 @@ var (
 	maxTimeInt64 = time.Unix(0, math.MaxInt64)
 )
 
-// Field is a stack based field and used for items that we want to store in error.
+// Field is a stack-based field and used for items that we want to store in error.
 type Field struct {
 	Key       string
 	Type      FieldType
@@ -24,21 +23,25 @@ type Field struct {
 
 // Format is implement the fmt.Formatter for field.
 func (f Field) Format(state fmt.State, verb rune) {
-	fmt.Printf("@@@@@@@@@@@@@@flag is %+v, %c", state, verb)
-	return
 	switch verb {
 	case 'v':
-		fmt.Printf("@@@@@@@@@@@@@@flag is %+v, %c", state, verb)
 		if state.Flag('+') {
-			fmt.Fprintf(state, "[%+v]", f.String())
+			fmt.Fprintf(state, "{Key: %s, Type: %s, Value: %+v}", f.Key, f.Type, f.Value())
+
+			return
 		}
 
-		fallthrough
-	case 'q':
-		fmt.Fprintf(state, "%q", f)
+		if state.Flag('#') {
+			fmt.Fprintf(state, "{%s: %#v}", f.Key, f.Value())
+
+			return
+		}
+
+		fmt.Fprintf(state, "{Key: %s, Value: %+v}", f.Key, f.Value())
 	case 's':
-		// fmt.Fprintf(state, "%v", f.va)
-		io.WriteString(state, f.String())
+		fmt.Fprintf(state, "[%s: %s]", f.Key, f.Value())
+	case 'q':
+		fmt.Fprintf(state, "%q", f.Value())
 	}
 }
 
@@ -77,35 +80,7 @@ func (f Field) Value() interface{} {
 
 // String version of Field.
 func (f Field) String() string {
-	switch f.Type {
-	case FieldTypeString:
-		return fmt.Sprintf("Key: %s, Type: String, Value: %s", f.Key, f.Str)
-	case FieldTypeInt64:
-		return fmt.Sprintf("Key: %s, Type: Int64, Value: %d", f.Key, f.Integer)
-	case FieldTypeFloat64:
-		return fmt.Sprintf("Key: %s, Type: Float64, Value: %f", f.Key, math.Float32frombits(uint32(f.Integer)))
-	case FieldTypeBinary:
-		return fmt.Sprintf("Key: %s, Type: Binary, Value: %s", f.Key, f.Interface)
-	case FieldTypeByteString:
-		return fmt.Sprintf("Key: %s, Type: ByteString, Value: %s", f.Key, f.Interface)
-	case FieldTypeError:
-		return fmt.Sprintf("Key: %s, Type: Error, Value: %v", f.Key, f.Interface)
-	case FieldTypeTimeFull:
-		return fmt.Sprintf("Key: %s, Type: TimeFull, Value: %s", f.Key, f.Interface)
-	case FieldTypeTime:
-		return fmt.Sprintf("Key: %s, Type: Time, Unix: %d, Location: %s", f.Key, f.Integer, f.Interface)
-	case FieldTypeDuration:
-		return fmt.Sprintf("Key: %s, Type: Duration, Value: %d", f.Key, f.Integer)
-	case FieldTypeBool:
-		var b bool
-		if f.Integer == 1 {
-			b = true
-		}
-
-		return fmt.Sprintf("Key: %s, Type: Bool, Value: %t", f.Key, b)
-	default:
-		return fmt.Sprintf("Key: %s, Type: %v, Value: %v", f.Key, f.Type, f.Interface)
-	}
+	return fmt.Sprintf("Key: %s, Type: %s, Value: %s", f.Key, f.Type, f.Value())
 }
 
 // Is compare field type.
@@ -113,15 +88,12 @@ func (f Field) Is(fieldType FieldType) bool {
 	return f.Type == fieldType
 }
 
-// FieldType is Field data type.
+// FieldType is a Field data type.
 type FieldType int
 
 const (
 	// FieldTypeUnknown is used if the data type is unknown.
 	FieldTypeUnknown FieldType = iota
-
-	// FieldTypeSkip is used for fields that want skip.
-	FieldTypeSkip
 
 	// FieldTypeReflect is used for fields that store Reflect.
 	FieldTypeReflect
@@ -159,6 +131,40 @@ const (
 	// FieldTypeContext is used for fields that store context.Context.
 	FieldTypeContext
 )
+
+// String version of FieldType.
+func (f FieldType) String() string {
+	switch f {
+	case FieldTypeReflect:
+		return "Reflect"
+	case FieldTypeString:
+		return "String"
+	case FieldTypeInt64:
+		return "Int64"
+	case FieldTypeFloat64:
+		return "Float64"
+	case FieldTypeBinary:
+		return "Binary"
+	case FieldTypeByteString:
+		return "ByteString"
+	case FieldTypeError:
+		return "Error"
+	case FieldTypeTimeFull:
+		return "TimeFull"
+	case FieldTypeTime:
+		return "Time"
+	case FieldTypeDuration:
+		return "Duration"
+	case FieldTypeBool:
+		return "Bool"
+	case FieldTypeContext:
+		return "Context"
+	case FieldTypeUnknown:
+		fallthrough
+	default:
+		return "Unknown"
+	}
+}
 
 // Any constructs a field with the given key and value.
 func Any(key string, val interface{}) Field { // nolint: cyclop
@@ -218,22 +224,16 @@ func Binary(key string, val []byte) Field {
 
 // Bool constructs a field that carries a bool.
 func Bool(key string, val bool) Field {
-	var ival int64
+	var iVal int64
 	if val {
-		ival = 1
+		iVal = 1
 	}
 
-	return Field{Key: key, Type: FieldTypeBool, Integer: ival}
+	return Field{Key: key, Type: FieldTypeBool, Integer: iVal}
 }
 
 // nilField returns a field which will marshal explicitly as nil.
 func nilField(key string) Field { return Reflect(key, nil) }
-
-// Skip constructs a no-op field, which is often useful when handling invalid
-// inputs in other Field constructors.
-func Skip() Field {
-	return Field{Type: FieldTypeSkip}
-}
 
 // Reflect constructs a field with the given key and an arbitrary object. It uses
 // an encoding-appropriate, reflection-based function to lazily serialize nearly
@@ -289,10 +289,6 @@ func ErrorField(err error) Field {
 // For the common case in which the key is simply "error", the Error function
 // is shorter and less repetitive.
 func NamedError(key string, err error) Field {
-	if err == nil {
-		return Skip()
-	}
-
 	return Field{Key: key, Type: FieldTypeError, Interface: err}
 }
 
@@ -302,11 +298,7 @@ func ContextField(ctx context.Context) Field {
 }
 
 // NamedContext constructs a field that carries a bool.
-func NamedContext(key string, ctx context.Context) Field { // nolint: golint
-	if ctx == nil {
-		return Skip()
-	}
-
+func NamedContext(key string, ctx context.Context) Field {
 	return Field{Key: key, Type: FieldTypeContext, Interface: ctx}
 }
 
@@ -393,17 +385,6 @@ func GetFields(err error) []Field {
 // GetField find you field based on the key.
 func GetField(err error, key string) Field {
 	for _, field := range GetError(err).fields {
-		if field.Key == key {
-			return field
-		}
-	}
-
-	return nilField(key)
-}
-
-// GetFieldFromChain search entire error chain.
-func GetFieldFromChain(err error, key string) Field {
-	for _, field := range GetChainFields(err) {
 		if field.Key == key {
 			return field
 		}
