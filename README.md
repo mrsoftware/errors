@@ -59,3 +59,10 @@ type causer interface {
 `errors.Cause` recursively try to find the error that supports the causer and retrieve the cause.
 
 for mode details, check the [documentation](https://godoc.org/github.com/mrsoftware/errors)
+
+
+----
+## Roadmap
+- [ ] Unit test
+- [ ] Multi error
+- [ ] Waiting error (sync.Waiting + errors)
