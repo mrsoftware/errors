@@ -17,8 +17,14 @@ func NewGroup() Group {
 }
 
 // Wait is sync.WaitGroup.Wait.
-func (g *Group) Wait() {
+func (g *Group) Wait() error {
 	g.wg.Wait()
+
+	if g.errors.Len() == 0 {
+		return nil
+	}
+
+	return &g.errors
 }
 
 // Add is sync.WaitGroup.Add.
@@ -35,15 +41,6 @@ func (g *Group) Done(err error) {
 	}
 
 	g.errors.Add(err)
-}
-
-// Err return all happened error as a single error.
-func (g *Group) Err() error {
-	if g.errors.Len() == 0 {
-		return nil
-	}
-
-	return &g.errors
 }
 
 // noCopy may be embedded into structs which must not be copied
