@@ -62,10 +62,6 @@ func GetError(err error) (Err *Error) {
 		return custom
 	}
 
-	if unwrapped := errors.Unwrap(err); unwrapped != nil {
-		return GetError(unwrapped)
-	}
-
 	return &Error{msg: err.Error(), cause: err}
 }
 
@@ -97,6 +93,12 @@ func Cause(err error) error {
 
 // Format is implement the fmt.Formatter for Error.
 func (e *Error) Format(state fmt.State, verb rune) {
+	if len(e.fields) == 0 {
+		fmt.Fprint(state, e.Error())
+
+		return
+	}
+
 	switch verb {
 	case 'v':
 		if state.Flag('+') {
