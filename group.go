@@ -12,8 +12,8 @@ type Group struct {
 }
 
 // NewGroup create new Group.
-func NewGroup() Group {
-	return Group{wg: sync.WaitGroup{}}
+func NewGroup() *Group {
+	return &Group{}
 }
 
 // Wait is sync.WaitGroup.Wait.

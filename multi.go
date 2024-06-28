@@ -3,8 +3,11 @@ package errors
 import (
 	"bytes"
 	"errors"
-	"log"
 	"sync"
+)
+
+const (
+	defaultErrorGroupSeparator = " | "
 )
 
 // MultiError is list of errors.
@@ -13,22 +16,28 @@ type MultiError struct {
 	mx     sync.Mutex
 }
 
-// NewMulti create new MultiError.
-func NewMulti() *MultiError {
-	return &MultiError{}
-}
-
 // NewMultiError create new MultiError error.
-func NewMultiError(errors ...error) error {
-	return &MultiError{errors: errors}
+func NewMultiError(errors ...error) *MultiError {
+	multi := &MultiError{}
+	for _, err := range errors {
+		multi.Add(err)
+	}
+
+	return multi
 }
 
 // Error sum of all errors.
 func (m *MultiError) Error() string {
+	if m.Len() == 0 {
+		return ""
+	}
+
 	buffer := &bytes.Buffer{}
-	for _, err := range m.errors {
-		if _, er := buffer.WriteString(err.Error()); er != nil {
-			log.Default().Println(er.Error())
+	for index, err := range m.errors {
+		buffer.WriteString(err.Error())
+
+		if index < len(m.errors)-1 {
+			buffer.WriteString(defaultErrorGroupSeparator)
 		}
 	}
 
@@ -58,8 +67,8 @@ func (m *MultiError) Add(err error) {
 	m.errors = append(m.errors, err)
 }
 
-// AddSafe is like add but concurrent safe.
-func (m *MultiError) AddSafe(err error) {
+// SafeAdd is like add but concurrent safe.
+func (m *MultiError) SafeAdd(err error) {
 	m.mx.Lock()
 	m.Add(err)
 	m.mx.Unlock()
@@ -70,15 +79,15 @@ func (m *MultiError) Len() int {
 	return len(m.errors)
 }
 
-// LenSafe is like len but concurrent safe.
-func (m *MultiError) LenSafe() int {
+// SafeLen is like len but concurrent safe.
+func (m *MultiError) SafeLen() int {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
 	return len(m.errors)
 }
 
-// Unwrap return cause error (last error in list).
+// Unwrap return cause error (first error in list).
 func (m *MultiError) Unwrap() error {
 	if len(m.errors) == 0 {
 		return nil
@@ -87,7 +96,7 @@ func (m *MultiError) Unwrap() error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
-	return m.errors[len(m.errors)-1]
+	return m.errors[0]
 }
 
 // Is check errors for match.
