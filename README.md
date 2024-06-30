@@ -1,46 +1,48 @@
 # errors
-> [!WARNING]  
-> Be aware this package is not ready for production usage and is in the development phase.
+## Enriching Error Handling in Go
 
-Package errors help with adding context to your errors.
+The errors package aims to empower you with a more robust approach to error handling in your Go applications. It addresses the limitations of Go's default error handling by providing features for:
+
+- **Contextual Information**: Add meaningful details to errors, making them more informative for debugging and troubleshooting.
+- **Error Chaining**: Create a chain of errors, capturing the root cause and subsequent events leading to the final error.
+- **Multiple Data**: Attach various types of data (strings, structs, etc.) to errors for richer context.
+- **MultiError**: Group and manage multiple errors without losing their individual structure. It's concurrent safe, can be used in multiple goroutine.
+- **WaitGroup**: Streamline m error handling by potentially providing abstractions for common use cases like MultiError + sync.WaitGroup.
+
+## Installation
 
 ```shell
 go get github.com/mrsoftware/errors
 ```
 
-The traditional error handling idiom in Go is roughly akin to
-```go
-if err != nil {
-    return err
-}
-```
+## Beyond Basic Error Handling
+Go's traditional error handling often results in error messages lacking context and debugging information, especially when errors propagate up the call stack. The errors package tackles this challenge by allowing you to enrich error messages with valuable data.
 
-which applied recursively up the call stack results in error reports without context or debugging information. 
-The errors package allows programmers to add context to the failure path in their code in a way that does not destroy the original value of the error.
-
-The errors package supports various context adding capabilities like other error packages,
-but the important part and the thing make it unique, is the ability to add multiple data in any type.
-some time you need to add contextual data into your error, in this case information about the user
+## Adding Context
+The errors.New function is your go-to tool for creating errors with context. You can pass additional arguments to specify different types of data:
 ```go
 user := struct { Username string }{Username: "mrsoftware"}
 errors.New("some error", errors.String("name", "mohammad"), errors.Reflect("user", user))
 ```
+ 
+## Retrieving Context
+To extract the added data from an error:
 
-to retrieve field from a single error
+- Single Error:
 ```go
 err := errors.New("some error", errors.String("username", "mrsoftware"))
 nameField := errors.GetField(err, "username")
 ```
 
-but if you need to look for field in the error chain
+- Error Chain:
 ```go
 cause := errors.New("cause error", errors.String("username", "mrsoftware"))
 err := errors.Wrap(err, "some error", errors.String("name", "mohammad"))
 nameField := errors.FindFieldInChain(err, "username")
 ```
 
-or you can wrap the cause error:
-
+## Wrapping Existing Errors
+The errors.Wrap function lets you add context to existing errors while preserving the original cause:
 ```go
 _, err := ioutil.ReadAll(r)
 if err != nil {
@@ -48,21 +50,82 @@ if err != nil {
 }
 ```
 
-as errors support the `causer` interface you can get the cause:
+## Retrieving Cause
+The package aims to incorporate a `Cause()` function that will assist you in traversing the error chain and retrieving the root cause error.
+
+
+## Handling Multiple Errors
+In scenarios where you encounter multiple errors concurrently, the `errors.MultiError` type offers a seamless way to aggregate them without resorting to cumbersome string concatenation. It also ensures thread safety for concurrent operations:
 
 ```go
-type causer interface {
-        Cause() error
+
+err := errors.NewMultiError(io.EOF, errors.New("getting data"))
+
+// Real Usage: when calling a third party service I need to check if error is timeout signal the up layer and do not want them notify timeout using lower level code, but my timeout. 
+err := callingHttpCode()
+if os.IsTimeout(errors.Cause(err)) {
+    return res, errors.NewMultiError(err, constants.ErrTimeout)
+}
+```
+**Real Usage**: some time happened you need to create list of error from multiple goroutine.
+```go
+//
+errorList := errors.NewMultiError()
+wg := &sync.WaitGroup{}
+
+wg.Add(1)
+go func(){
+	err := callingHttpClient()
+	errorList.SafeAdd(err) // if result of `callingHttpClient` is nil no error will add to the err list.
+
+	wg.Done()
+}()
+
+wg.Add(1)
+go func(){
+    err := callingHttpClient()
+	if err != nil {
+        errorList.SafeAdd(err)
+    }
+
+	wg.Done()
+}()
+
+wg.Wait()
+
+if err := errorList.Err(); err != nil {
+	// oh, something bad happened in one of routines above.
 }
 ```
 
-`errors.Cause` recursively try to find the error that supports the causer and retrieve the cause.
+## Combining sync.WaitGroup and errors.MultiError
+The `errors.WaitGroup` type simplifies error handling in concurrent operations by merging `sync.WaitGroup` with `MultiError`. This reduces boilerplate code for cleaner and more concise error handling:
+```go
+wg := &errors.WaitGroup{}
+
+wg.Add(1)
+go func(){
+    wg.Done(callingHttpClient())
+}()
+
+wg.Add(1)
+go func(){
+    err := callingHttpClient()
+	wg.Done(err)
+}()
+
+
+
+if err := wg.Wait(); err != nil {
+    // oh, something bad happened in one of routines above.
+} 
+```
 
 for mode details, check the [documentation](https://godoc.org/github.com/mrsoftware/errors)
-
 
 ----
 ## Roadmap
 - [ ] Unit test
-- [ ] Multi error
-- [ ] Waiting error (sync.Waiting + errors)
+- [ ] complete toolbox
+- [X] Multi error
+- [X] Waiting error (sync.Waiting + errors)
