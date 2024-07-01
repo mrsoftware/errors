@@ -112,3 +112,17 @@ func (m *MultiError) Is(err error) bool {
 
 	return false
 }
+
+// As implements errors.As by attempting to map to the current value.
+func (m *MultiError) As(target interface{}) bool {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+
+	for i := range m.errors {
+		if errors.As(m.errors[i], target) {
+			return true
+		}
+	}
+
+	return false
+}
