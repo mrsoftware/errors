@@ -115,3 +115,28 @@ func TestMultiError_Is(t *testing.T) {
 		assert.False(t, stdErr.Is(err, error3))
 	})
 }
+
+func TestMultiError_As(t *testing.T) {
+	t.Run("requested err found in list, expect to get true", func(t *testing.T) {
+		error1 := stdErr.New("error 1")
+		error2 := New("my error")
+
+		err := NewMultiError(error1, error2)
+
+		myErr := &Error{}
+
+		assert.True(t, stdErr.As(err, &myErr))
+		assert.Equal(t, error2, myErr)
+	})
+
+	t.Run("requested err is not in list, expect to get false", func(t *testing.T) {
+		error1 := stdErr.New("error 1")
+		error2 := stdErr.New("error 2")
+
+		err := NewMultiError(error1, error2)
+
+		myErr := &Error{}
+
+		assert.False(t, stdErr.As(err, &myErr))
+	})
+}
