@@ -2,6 +2,7 @@
 package errors_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/mrsoftware/errors"
@@ -41,4 +42,38 @@ func TestFindFieldInChain(t *testing.T) {
 	assert.Equal(t, errors.FieldTypeReflect, errors.FindFieldInChain("field4", err4).Type)
 	assert.Equal(t, field2, errors.FindFieldInChain("field2", err4))
 	assert.Equal(t, field1, errors.FindFieldInChain("field1", err1))
+}
+
+func TestField_Format(t *testing.T) {
+	t.Parallel()
+
+	t.Run("format q", func(t *testing.T) {
+		field := errors.String("username", "mrsoftware")
+
+		assert.Equal(t, "\"mrsoftware\"", fmt.Sprintf("%q", field))
+	})
+
+	t.Run("format s", func(t *testing.T) {
+		field := errors.String("username", "mrsoftware")
+
+		assert.Equal(t, "[username: mrsoftware]", fmt.Sprintf("%s", field))
+	})
+
+	t.Run("format v", func(t *testing.T) {
+		field := errors.String("username", "mrsoftware")
+
+		assert.Equal(t, "{Key: username, Value: mrsoftware}", fmt.Sprintf("%v", field))
+	})
+
+	t.Run("format +v", func(t *testing.T) {
+		field := errors.String("username", "mrsoftware")
+
+		assert.Equal(t, "{Key: username, Type: String, Value: mrsoftware}", fmt.Sprintf("%+v", field))
+	})
+
+	t.Run("format #v", func(t *testing.T) {
+		field := errors.String("username", "mrsoftware")
+
+		assert.Equal(t, "{username: \"mrsoftware\"}", fmt.Sprintf("%#v", field))
+	})
 }
