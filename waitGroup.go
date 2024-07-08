@@ -1,19 +1,30 @@
 package errors
 
 import (
+	"context"
 	"sync"
 )
 
 // WaitGroup is sync.WaitGroup with error support.
 type WaitGroup struct {
-	noCopy  noCopy
-	options *WaitGroupOptions
-	errors  MultiError
-	gch     chan struct{}
+	noCopy     noCopy
+	options    *WaitGroupOptions
+	errors     MultiError
+	gch        chan struct{}
+	ctx        context.Context
+	cancel     context.CancelCauseFunc
+	cancelOnce sync.Once
 }
 
 // NewWaitGroup create new WaitGroup.
 func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
+	_, wg := NewWaitGroupWithContext(context.Background(), options...)
+
+	return wg
+}
+
+// NewWaitGroupWithContext create new WaitGroup with custom context.
+func NewWaitGroupWithContext(ctx context.Context, options ...WaitGroupOption) (context.Context, *WaitGroup) {
 	ops := &WaitGroupOptions{
 		Wg:         &sync.WaitGroup{},
 		TaskRunner: func(task func()) { go task() },
@@ -28,12 +39,26 @@ func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
 		gch = make(chan struct{}, ops.TaskLimit)
 	}
 
-	return &WaitGroup{options: ops, gch: gch}
+	ctx, cancel := context.WithCancelCause(context.Background())
+
+	return ctx, &WaitGroup{options: ops, gch: gch, ctx: ctx, cancel: cancel}
+}
+
+// Context of current waitGroup.
+func (g *WaitGroup) Context() context.Context {
+	return g.ctx
+}
+
+// Stop send cancel signal to all tasks.
+func (g *WaitGroup) Stop(err error) {
+	g.cancelOnce.Do(func() { g.cancel(err) })
 }
 
 // Wait is sync.WaitGroup.Wait.
-func (g *WaitGroup) Wait() error {
+func (g *WaitGroup) Wait() (err error) {
 	g.options.Wg.Wait()
+
+	defer func() { g.Stop(err) }()
 
 	if g.errors.Len() == 0 {
 		return nil
@@ -53,6 +78,10 @@ func (g *WaitGroup) Done(err error) {
 
 	if err == nil {
 		return
+	}
+
+	if g.options.StopOnError {
+		g.Stop(err)
 	}
 
 	g.errors.Add(err)
@@ -84,9 +113,10 @@ type noCopy struct{}
 
 // WaitGroupOptions for WaitGroup.
 type WaitGroupOptions struct {
-	Wg         *sync.WaitGroup
-	TaskLimit  int
-	TaskRunner WaitGroupTaskRunner
+	Wg          *sync.WaitGroup
+	TaskLimit   int
+	TaskRunner  WaitGroupTaskRunner
+	StopOnError bool
 }
 
 type WaitGroupOption func(group *WaitGroupOptions)
@@ -112,5 +142,12 @@ func WaitGroupWithTaskLimit(limit int) WaitGroupOption {
 func WaitGroupWithTaskRunner(runner WaitGroupTaskRunner) WaitGroupOption {
 	return func(g *WaitGroupOptions) {
 		g.TaskRunner = runner
+	}
+}
+
+// WaitGroupWithStopOnError used if you want to stop all tasks on first error.
+func WaitGroupWithStopOnError() WaitGroupOption {
+	return func(g *WaitGroupOptions) {
+		g.StopOnError = true
 	}
 }
