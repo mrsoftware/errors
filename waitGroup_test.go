@@ -111,6 +111,26 @@ func TestGroup(t *testing.T) {
 		err := wg.Wait()
 		assert.Nil(t, err)
 	})
+
+	t.Run("using custom task runner, expect to use my task runner and not GoRoutine", func(t *testing.T) {
+		var isUsedCustomRunner bool
+		// custom task Runner for test
+		runner := func(task func()) {
+			task()
+
+			isUsedCustomRunner = true
+		}
+
+		wg := NewWaitGroup(WaitGroupWithTaskRunner(runner))
+
+		wg.Do(func() error {
+			return nil
+		})
+
+		err := wg.Wait()
+		assert.Nil(t, err)
+		assert.True(t, isUsedCustomRunner)
+	})
 }
 
 // all below test cases are copied from sync/waitgroup_test.go and transformed to group.
