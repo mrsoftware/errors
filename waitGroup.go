@@ -14,7 +14,10 @@ type WaitGroup struct {
 
 // NewWaitGroup create new WaitGroup.
 func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
-	ops := &WaitGroupOptions{Wg: &sync.WaitGroup{}}
+	ops := &WaitGroupOptions{
+		Wg:         &sync.WaitGroup{},
+		TaskRunner: func(task func()) { go task() },
+	}
 
 	for _, op := range options {
 		op(ops)
@@ -63,13 +66,13 @@ func (g *WaitGroup) Do(f func() error) {
 
 	g.Add(1)
 
-	go func() {
+	g.options.TaskRunner(func() {
 		g.Done(f())
 
 		if g.gch != nil {
 			<-g.gch
 		}
-	}()
+	})
 }
 
 // noCopy may be embedded into structs which must not be copied
@@ -81,11 +84,14 @@ type noCopy struct{}
 
 // WaitGroupOptions for WaitGroup.
 type WaitGroupOptions struct {
-	Wg        *sync.WaitGroup
-	TaskLimit int
+	Wg         *sync.WaitGroup
+	TaskLimit  int
+	TaskRunner WaitGroupTaskRunner
 }
 
 type WaitGroupOption func(group *WaitGroupOptions)
+
+type WaitGroupTaskRunner func(task func())
 
 // WaitGroupWithSyncWaitGroup used if you want to use parent sync.WaitGroup.
 func WaitGroupWithSyncWaitGroup(wg *sync.WaitGroup) WaitGroupOption {
@@ -99,5 +105,12 @@ func WaitGroupWithSyncWaitGroup(wg *sync.WaitGroup) WaitGroupOption {
 func WaitGroupWithTaskLimit(limit int) WaitGroupOption {
 	return func(g *WaitGroupOptions) {
 		g.TaskLimit = limit
+	}
+}
+
+// WaitGroupWithTaskRunner used if you want your custom task runner instead of Go routine.
+func WaitGroupWithTaskRunner(runner WaitGroupTaskRunner) WaitGroupOption {
+	return func(g *WaitGroupOptions) {
+		g.TaskRunner = runner
 	}
 }

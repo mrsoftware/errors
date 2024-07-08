@@ -162,6 +162,28 @@ if err := wg.Wait(); err != nil {
 } 
 ```
 
+## Use Custom runner instead of GoRoutine in errors.WaitGroup
+```go
+import (
+    "github.com/mrsoftware/errors"
+    "github.com/panjf2000/ants/v2"
+)
+
+// in this example we are using ants goroutine pool.
+wg := errors.NewWaitGroup(errors.WaitGroupWithTaskRunner(ants.Submit)) 
+
+wg.Do(func() error {
+    return callingHttpClient()
+})
+
+wg.Do(func() error {
+    return callingHttpClient()
+})
+ 
+if err := wg.Wait(); err != nil {
+    // oh, something bad happened in one of routines above.
+} 
+```
 
 
 for mode details, check the [documentation](https://godoc.org/github.com/mrsoftware/errors)
