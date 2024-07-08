@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -130,6 +131,30 @@ func TestGroup(t *testing.T) {
 		err := wg.Wait()
 		assert.Nil(t, err)
 		assert.True(t, isUsedCustomRunner)
+	})
+
+	t.Run("set StopOnError options", func(t *testing.T) {
+		error1 := errors.New("error 1")
+
+		ctx, wg := NewWaitGroupWithContext(context.Background(), WaitGroupWithStopOnError())
+
+		wg.Do(func() error { return error1 })
+
+		// sample long-running and context aware task.
+		wg.Do(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+
+		err := wg.Wait()
+
+		expected := NewMultiError(error1, context.Canceled)
+		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
+		assert.Equal(t, ctx, wg.Context())
 	})
 }
 

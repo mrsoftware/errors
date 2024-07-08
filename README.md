@@ -184,7 +184,52 @@ if err := wg.Wait(); err != nil {
     // oh, something bad happened in one of routines above.
 } 
 ```
+## Stop all tasks on first error
+```go
+import (
+    "github.com/mrsoftware/errors"
+)
 
+// in this example we are using ants goroutine pool.
+wg := errors.NewWaitGroup(errors.WaitGroupWithStopOnError()) 
+
+ctx := wg.Context()
+
+wg.Do(func() error {
+    return callingHttpClient(ctx)
+})
+
+wg.Do(func() error {
+    return callingHttpClient(ctx)
+})
+ 
+// if one of above task failed, context will cancel and other task will stop (the task must ba aware of context cancellation like http pkg do)
+
+if err := wg.Wait(); err != nil {
+    // oh, something bad happened in one of routines above.
+} 
+```
+**or you can use NewWaitGroupWithContext method:**
+```go
+import (
+    "github.com/mrsoftware/errors"
+)
+
+// in this example we are using ants goroutine pool.
+ctx, wg := errors.NewWaitGroupWithContext(context.Background(), errors.WaitGroupWithStopOnError()) 
+
+wg.Do(func() error {
+    return callingHttpClient(ctx)
+})
+
+wg.Do(func() error {
+    return callingHttpClient(ctx)
+})
+ 
+if err := wg.Wait(); err != nil {
+    // oh, something bad happened in one of routines above.
+} 
+```
 
 for mode details, check the [documentation](https://godoc.org/github.com/mrsoftware/errors)
 
