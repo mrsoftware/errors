@@ -101,7 +101,7 @@ if err := errorList.Err(); err != nil {
 ## Combining sync.WaitGroup and errors.MultiError
 The `errors.WaitGroup` type simplifies error handling in concurrent operations by merging `sync.WaitGroup` with `MultiError`. This reduces boilerplate code for cleaner and more concise error handling:
 ```go
-wg := &errors.WaitGroup{}
+wg := errors.NewWaitGroup() // you can pass some options, e.g: your custom sync.WaitGroup using WaitGroupWithSyncWaitGroup.
 
 wg.Add(1)
 go func(){

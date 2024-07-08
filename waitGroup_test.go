@@ -52,6 +52,31 @@ func TestGroup(t *testing.T) {
 		err := wg.Wait()
 		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
 	})
+
+	t.Run("expect to use passed waitGroup in options", func(t *testing.T) {
+		goWG := &sync.WaitGroup{}
+
+		wg := NewWaitGroup(WaitGroupWithSyncWaitGroup(goWG))
+
+		goWG.Add(1)
+
+		go func() {
+			goWG.Done()
+		}()
+
+		wg.Add(1)
+		go func() {
+			wg.Done(nil)
+		}()
+
+		wg.Add(1)
+		go func() {
+			wg.Done(nil)
+		}()
+
+		err := wg.Wait()
+		assert.Nil(t, err)
+	})
 }
 
 // all below test cases are copied from sync/waitgroup_test.go and transformed to group.
@@ -83,8 +108,8 @@ func testWaitGroup(t *testing.T, wg1 *WaitGroup, wg2 *WaitGroup) {
 }
 
 func TestWaitGroup(t *testing.T) {
-	wg1 := &WaitGroup{}
-	wg2 := &WaitGroup{}
+	wg1 := NewWaitGroup()
+	wg2 := NewWaitGroup()
 
 	// Run the same test a few times to ensure barrier is in a proper state.
 	for i := 0; i != 8; i++ {
@@ -99,7 +124,7 @@ func TestWaitGroupMisuse(t *testing.T) {
 			t.Fatalf("Unexpected panic: %#v", err)
 		}
 	}()
-	wg := &WaitGroup{}
+	wg := NewWaitGroup()
 	wg.Add(1)
 	wg.Done(nil)
 	wg.Done(nil)
@@ -109,7 +134,7 @@ func TestWaitGroupMisuse(t *testing.T) {
 func TestWaitGroupRace(t *testing.T) {
 	// Run this test for about 1ms.
 	for i := 0; i < 1000; i++ {
-		wg := &WaitGroup{}
+		wg := NewWaitGroup()
 		n := new(int32)
 		// spawn goroutine 1
 		wg.Add(1)
