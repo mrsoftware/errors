@@ -6,19 +6,25 @@ import (
 
 // WaitGroup is sync.WaitGroup with error support.
 type WaitGroup struct {
-	noCopy noCopy
-	wg     sync.WaitGroup
-	errors MultiError
+	noCopy  noCopy
+	options *WaitGroupOptions
+	errors  MultiError
 }
 
 // NewWaitGroup create new WaitGroup.
-func NewWaitGroup() *WaitGroup {
-	return &WaitGroup{}
+func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
+	ops := &WaitGroupOptions{Wg: &sync.WaitGroup{}}
+
+	for _, op := range options {
+		op(ops)
+	}
+
+	return &WaitGroup{options: ops}
 }
 
 // Wait is sync.WaitGroup.Wait.
 func (g *WaitGroup) Wait() error {
-	g.wg.Wait()
+	g.options.Wg.Wait()
 
 	if g.errors.Len() == 0 {
 		return nil
@@ -29,12 +35,12 @@ func (g *WaitGroup) Wait() error {
 
 // Add is sync.WaitGroup.Add.
 func (g *WaitGroup) Add(delta int) {
-	g.wg.Add(delta)
+	g.options.Wg.Add(delta)
 }
 
 // Done is sync.WaitGroup.Done, but is support error as parameter.
 func (g *WaitGroup) Done(err error) {
-	g.wg.Done()
+	g.options.Wg.Done()
 
 	if err == nil {
 		return
@@ -49,3 +55,17 @@ func (g *WaitGroup) Done(err error) {
 // See https://golang.org/issues/8005#issuecomment-190753527
 // for details.
 type noCopy struct{}
+
+// WaitGroupOptions for WaitGroup.
+type WaitGroupOptions struct {
+	Wg *sync.WaitGroup
+}
+
+type WaitGroupOption func(group *WaitGroupOptions)
+
+// WaitGroupWithSyncWaitGroup used if you want to use parent sync.WaitGroup.
+func WaitGroupWithSyncWaitGroup(wg *sync.WaitGroup) WaitGroupOption {
+	return func(g *WaitGroupOptions) {
+		g.Wg = wg
+	}
+}
