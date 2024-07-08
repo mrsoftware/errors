@@ -9,6 +9,7 @@ type WaitGroup struct {
 	noCopy  noCopy
 	options *WaitGroupOptions
 	errors  MultiError
+	gch     chan struct{}
 }
 
 // NewWaitGroup create new WaitGroup.
@@ -19,7 +20,12 @@ func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
 		op(ops)
 	}
 
-	return &WaitGroup{options: ops}
+	var gch chan struct{}
+	if ops.TaskLimit > 0 {
+		gch = make(chan struct{}, ops.TaskLimit)
+	}
+
+	return &WaitGroup{options: ops, gch: gch}
 }
 
 // Wait is sync.WaitGroup.Wait.
@@ -51,9 +57,19 @@ func (g *WaitGroup) Done(err error) {
 
 // Do calls the given function in a new goroutine.
 func (g *WaitGroup) Do(f func() error) {
+	if g.gch != nil {
+		g.gch <- struct{}{}
+	}
+
 	g.Add(1)
 
-	go func() { g.Done(f()) }()
+	go func() {
+		g.Done(f())
+
+		if g.gch != nil {
+			<-g.gch
+		}
+	}()
 }
 
 // noCopy may be embedded into structs which must not be copied
@@ -65,7 +81,8 @@ type noCopy struct{}
 
 // WaitGroupOptions for WaitGroup.
 type WaitGroupOptions struct {
-	Wg *sync.WaitGroup
+	Wg        *sync.WaitGroup
+	TaskLimit int
 }
 
 type WaitGroupOption func(group *WaitGroupOptions)
@@ -74,5 +91,13 @@ type WaitGroupOption func(group *WaitGroupOptions)
 func WaitGroupWithSyncWaitGroup(wg *sync.WaitGroup) WaitGroupOption {
 	return func(g *WaitGroupOptions) {
 		g.Wg = wg
+	}
+}
+
+// WaitGroupWithTaskLimit used if you want set limitation for task count.
+// this option works only for Do method.
+func WaitGroupWithTaskLimit(limit int) WaitGroupOption {
+	return func(g *WaitGroupOptions) {
+		g.TaskLimit = limit
 	}
 }

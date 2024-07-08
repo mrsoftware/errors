@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -92,6 +93,23 @@ func TestGroup(t *testing.T) {
 		expected := NewMultiError(error1)
 
 		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
+	})
+
+	t.Run("we have limitation on task count, expect to block", func(t *testing.T) {
+		limitCount := 1
+		wg := NewWaitGroup(WaitGroupWithTaskLimit(limitCount))
+
+		wg.Do(func() error {
+			// wait for assertion to do.
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		})
+
+		// if len of wg.gch and its cap are equal, its mean no more room for new task to run.
+		assert.Equal(t, len(wg.gch), cap(wg.gch))
+
+		err := wg.Wait()
+		assert.Nil(t, err)
 	})
 }
 
