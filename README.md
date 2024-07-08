@@ -140,6 +140,29 @@ if err := wg.Wait(); err != nil {
 } 
 ```
 
+## limiting the concurrent task counts using limit Options in errors.WaitGroup
+```go
+wg := errors.NewWaitGroup(errors.WaitGroupWithTaskLimit(2)) 
+
+wg.Do(func() error {
+    return callingHttpClient()
+})
+
+wg.Do(func() error {
+    return callingHttpClient()
+})
+
+// we set limit concurrent task to 2, so this task will block until one of above are done.
+wg.Do(func() error {
+	return callingHttpClient()
+})
+
+if err := wg.Wait(); err != nil {
+    // oh, something bad happened in one of routines above.
+} 
+```
+
+
 
 for mode details, check the [documentation](https://godoc.org/github.com/mrsoftware/errors)
 
