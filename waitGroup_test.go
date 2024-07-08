@@ -77,6 +77,22 @@ func TestGroup(t *testing.T) {
 		err := wg.Wait()
 		assert.Nil(t, err)
 	})
+
+	t.Run("expect to Do method act as combination of Add and Done method together", func(t *testing.T) {
+		error1 := errors.New("error 1")
+
+		wg := NewWaitGroup()
+
+		wg.Do(func() error { return error1 })
+
+		wg.Do(func() error { return nil })
+
+		err := wg.Wait()
+
+		expected := NewMultiError(error1)
+
+		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
+	})
 }
 
 // all below test cases are copied from sync/waitgroup_test.go and transformed to group.

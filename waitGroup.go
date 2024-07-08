@@ -49,6 +49,13 @@ func (g *WaitGroup) Done(err error) {
 	g.errors.Add(err)
 }
 
+// Do calls the given function in a new goroutine.
+func (g *WaitGroup) Do(f func() error) {
+	g.Add(1)
+
+	go func() { g.Done(f()) }()
+}
+
 // noCopy may be embedded into structs which must not be copied
 // after the first use.
 //

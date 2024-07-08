@@ -121,6 +121,26 @@ if err := wg.Wait(); err != nil {
 } 
 ```
 
+**or you can use Do method and let WaitGroup handle Add and Done internally.**
+
+```go
+wg := errors.NewWaitGroup() 
+
+wg.Do(func() error {
+    return callingHttpClient()
+})
+
+wg.Do(func() error {
+    return callingHttpClient()
+})
+
+
+if err := wg.Wait(); err != nil {
+    // oh, something bad happened in one of routines above.
+} 
+```
+
+
 for mode details, check the [documentation](https://godoc.org/github.com/mrsoftware/errors)
 
 ----
