@@ -1,10 +1,12 @@
 package errors
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -52,6 +54,108 @@ func TestGroup(t *testing.T) {
 		err := wg.Wait()
 		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
 	})
+
+	t.Run("expect to use passed waitGroup in options", func(t *testing.T) {
+		goWG := &sync.WaitGroup{}
+
+		wg := NewWaitGroup(WaitGroupWithSyncWaitGroup(goWG))
+
+		goWG.Add(1)
+
+		go func() {
+			goWG.Done()
+		}()
+
+		wg.Add(1)
+		go func() {
+			wg.Done(nil)
+		}()
+
+		wg.Add(1)
+		go func() {
+			wg.Done(nil)
+		}()
+
+		err := wg.Wait()
+		assert.Nil(t, err)
+	})
+
+	t.Run("expect to Do method act as combination of Add and Done method together", func(t *testing.T) {
+		error1 := errors.New("error 1")
+
+		wg := NewWaitGroup()
+
+		wg.Do(func() error { return error1 })
+
+		wg.Do(func() error { return nil })
+
+		err := wg.Wait()
+
+		expected := NewMultiError(error1)
+
+		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
+	})
+
+	t.Run("we have limitation on task count, expect to block", func(t *testing.T) {
+		limitCount := 1
+		wg := NewWaitGroup(WaitGroupWithTaskLimit(limitCount))
+
+		wg.Do(func() error {
+			// wait for assertion to do.
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		})
+
+		// if len of wg.gch and its cap are equal, its mean no more room for new task to run.
+		assert.Equal(t, len(wg.gch), cap(wg.gch))
+
+		err := wg.Wait()
+		assert.Nil(t, err)
+	})
+
+	t.Run("using custom task runner, expect to use my task runner and not GoRoutine", func(t *testing.T) {
+		var isUsedCustomRunner bool
+		// custom task Runner for test
+		runner := func(task func()) {
+			task()
+
+			isUsedCustomRunner = true
+		}
+
+		wg := NewWaitGroup(WaitGroupWithTaskRunner(runner))
+
+		wg.Do(func() error {
+			return nil
+		})
+
+		err := wg.Wait()
+		assert.Nil(t, err)
+		assert.True(t, isUsedCustomRunner)
+	})
+
+	t.Run("set StopOnError options", func(t *testing.T) {
+		error1 := errors.New("error 1")
+
+		ctx, wg := NewWaitGroupWithContext(context.Background(), WaitGroupWithStopOnError())
+
+		wg.Do(func() error { return error1 })
+
+		// sample long-running and context aware task.
+		wg.Do(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+
+		err := wg.Wait()
+
+		expected := NewMultiError(error1, context.Canceled)
+		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
+		assert.Equal(t, ctx, wg.Context())
+	})
 }
 
 // all below test cases are copied from sync/waitgroup_test.go and transformed to group.
@@ -83,8 +187,8 @@ func testWaitGroup(t *testing.T, wg1 *WaitGroup, wg2 *WaitGroup) {
 }
 
 func TestWaitGroup(t *testing.T) {
-	wg1 := &WaitGroup{}
-	wg2 := &WaitGroup{}
+	wg1 := NewWaitGroup()
+	wg2 := NewWaitGroup()
 
 	// Run the same test a few times to ensure barrier is in a proper state.
 	for i := 0; i != 8; i++ {
@@ -99,7 +203,7 @@ func TestWaitGroupMisuse(t *testing.T) {
 			t.Fatalf("Unexpected panic: %#v", err)
 		}
 	}()
-	wg := &WaitGroup{}
+	wg := NewWaitGroup()
 	wg.Add(1)
 	wg.Done(nil)
 	wg.Done(nil)
@@ -109,7 +213,7 @@ func TestWaitGroupMisuse(t *testing.T) {
 func TestWaitGroupRace(t *testing.T) {
 	// Run this test for about 1ms.
 	for i := 0; i < 1000; i++ {
-		wg := &WaitGroup{}
+		wg := NewWaitGroup()
 		n := new(int32)
 		// spawn goroutine 1
 		wg.Add(1)
