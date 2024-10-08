@@ -85,9 +85,9 @@ func TestGroup(t *testing.T) {
 
 		wg := NewWaitGroup()
 
-		wg.Do(func() error { return error1 })
+		wg.Do(context.Background(), func(ctx context.Context) error { return error1 })
 
-		wg.Do(func() error { return nil })
+		wg.Do(context.Background(), func(ctx context.Context) error { return nil })
 
 		err := wg.Wait()
 
@@ -100,7 +100,7 @@ func TestGroup(t *testing.T) {
 		limitCount := 1
 		wg := NewWaitGroup(WaitGroupWithTaskLimit(limitCount))
 
-		wg.Do(func() error {
+		wg.Do(context.Background(), func(ctx context.Context) error {
 			// wait for assertion to do.
 			time.Sleep(100 * time.Millisecond)
 			return nil
@@ -124,7 +124,7 @@ func TestGroup(t *testing.T) {
 
 		wg := NewWaitGroup(WaitGroupWithTaskRunner(runner))
 
-		wg.Do(func() error {
+		wg.Do(context.Background(), func(ctx context.Context) error {
 			return nil
 		})
 
@@ -136,12 +136,12 @@ func TestGroup(t *testing.T) {
 	t.Run("set StopOnError options", func(t *testing.T) {
 		error1 := errors.New("error 1")
 
-		ctx, wg := NewWaitGroupWithContext(context.Background(), WaitGroupWithStopOnError())
+		wg := NewWaitGroup(WaitGroupWithStopOnError(), WaitGroupWithContext(context.Background()))
 
-		wg.Do(func() error { return error1 })
+		wg.Do(nil, func(ctx context.Context) error { return error1 })
 
 		// sample long-running and context aware task.
-		wg.Do(func() error {
+		wg.Do(nil, func(ctx context.Context) error {
 			for {
 				select {
 				case <-ctx.Done():
@@ -154,7 +154,7 @@ func TestGroup(t *testing.T) {
 
 		expected := NewMultiError(error1, context.Canceled)
 		assert.ElementsMatch(t, expected.errors, err.(*MultiError).errors)
-		assert.Equal(t, ctx, wg.Context())
+		assert.NotNil(t, wg.Context())
 	})
 }
 

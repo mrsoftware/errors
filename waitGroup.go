@@ -18,16 +18,10 @@ type WaitGroup struct {
 
 // NewWaitGroup create new WaitGroup.
 func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
-	_, wg := NewWaitGroupWithContext(context.Background(), options...)
-
-	return wg
-}
-
-// NewWaitGroupWithContext create new WaitGroup with custom context.
-func NewWaitGroupWithContext(ctx context.Context, options ...WaitGroupOption) (context.Context, *WaitGroup) {
 	ops := &WaitGroupOptions{
 		Wg:         &sync.WaitGroup{},
 		TaskRunner: func(task func()) { go task() },
+		Ctx:        context.Background(),
 	}
 
 	for _, op := range options {
@@ -39,9 +33,9 @@ func NewWaitGroupWithContext(ctx context.Context, options ...WaitGroupOption) (c
 		gch = make(chan struct{}, ops.TaskLimit)
 	}
 
-	ctx, cancel := context.WithCancelCause(context.Background())
+	ctx, cancel := context.WithCancelCause(ops.Ctx)
 
-	return ctx, &WaitGroup{options: ops, gch: gch, ctx: ctx, cancel: cancel}
+	return &WaitGroup{options: ops, gch: gch, ctx: ctx, cancel: cancel}
 }
 
 // Context of current waitGroup.
@@ -87,8 +81,12 @@ func (g *WaitGroup) Done(err error) {
 	g.errors.Add(err)
 }
 
-// Do calls the given function in a new goroutine.
-func (g *WaitGroup) Do(f func() error) {
+// Do run the given function in a new goroutine.
+func (g *WaitGroup) Do(ctx context.Context, f func(ctx context.Context) error) {
+	if ctx == nil {
+		ctx = g.ctx
+	}
+
 	if g.gch != nil {
 		g.gch <- struct{}{}
 	}
@@ -96,7 +94,7 @@ func (g *WaitGroup) Do(f func() error) {
 	g.Add(1)
 
 	g.options.TaskRunner(func() {
-		g.Done(f())
+		g.Done(f(ctx))
 
 		if g.gch != nil {
 			<-g.gch
@@ -117,6 +115,7 @@ type WaitGroupOptions struct {
 	TaskLimit   int
 	TaskRunner  WaitGroupTaskRunner
 	StopOnError bool
+	Ctx         context.Context
 }
 
 type WaitGroupOption func(group *WaitGroupOptions)
@@ -149,5 +148,12 @@ func WaitGroupWithTaskRunner(runner WaitGroupTaskRunner) WaitGroupOption {
 func WaitGroupWithStopOnError() WaitGroupOption {
 	return func(g *WaitGroupOptions) {
 		g.StopOnError = true
+	}
+}
+
+// WaitGroupWithContext if you want to pass your context.
+func WaitGroupWithContext(ctx context.Context) WaitGroupOption {
+	return func(g *WaitGroupOptions) {
+		g.Ctx = ctx
 	}
 }
