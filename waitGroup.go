@@ -14,6 +14,7 @@ type WaitGroup struct {
 	ctx        context.Context
 	cancel     context.CancelCauseFunc
 	cancelOnce sync.Once
+	wait       chan struct{}
 }
 
 // NewWaitGroup create new WaitGroup.
@@ -35,7 +36,7 @@ func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
 
 	ctx, cancel := context.WithCancelCause(ops.Ctx)
 
-	return &WaitGroup{options: ops, gch: gch, ctx: ctx, cancel: cancel}
+	return &WaitGroup{options: ops, gch: gch, ctx: ctx, cancel: cancel, wait: make(chan struct{})}
 }
 
 // Context of current waitGroup.
@@ -54,11 +55,22 @@ func (g *WaitGroup) Wait() (err error) {
 
 	defer func() { g.Stop(err) }()
 
-	if g.errors.Len() == 0 {
-		return nil
+	select {
+	case g.wait <- struct{}{}:
+	default:
 	}
 
-	return &g.errors
+	return g.errors.Err()
+}
+
+// WaitChan is like Wait method but return chanel.
+func (g *WaitGroup) WaitChan() <-chan struct{} {
+	return g.wait
+}
+
+// Err of tasks.
+func (g *WaitGroup) Err() error {
+	return g.errors.Err()
 }
 
 // Add is sync.WaitGroup.Add.
@@ -81,8 +93,14 @@ func (g *WaitGroup) Done(err error) {
 	g.errors.Add(err)
 }
 
-// Do run the given function in a new goroutine.
-func (g *WaitGroup) Do(ctx context.Context, f func(ctx context.Context) error) {
+// Do run the given function in a new goroutine with internal context.
+func (g *WaitGroup) Do(f func(ctx context.Context) error) {
+	g.DoWithContext(g.ctx, f)
+}
+
+// DoWithContext run the given function in a new goroutine with custom context.
+// if passed context is nil, use the internal context.
+func (g *WaitGroup) DoWithContext(ctx context.Context, f func(ctx context.Context) error) {
 	if ctx == nil {
 		ctx = g.ctx
 	}

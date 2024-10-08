@@ -126,11 +126,11 @@ if err := wg.Wait(); err != nil {
 ```go
 wg := errors.NewWaitGroup() 
 
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient()
 })
 
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient()
 })
 
@@ -144,16 +144,16 @@ if err := wg.Wait(); err != nil {
 ```go
 wg := errors.NewWaitGroup(errors.WaitGroupWithTaskLimit(2)) 
 
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient()
 })
 
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient()
 })
 
 // we set limit concurrent task to 2, so this task will block until one of above are done.
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
 	return callingHttpClient()
 })
 
@@ -172,11 +172,11 @@ import (
 // in this example we are using ants goroutine pool.
 wg := errors.NewWaitGroup(errors.WaitGroupWithTaskRunner(ants.Submit)) 
 
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient()
 })
 
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient()
 })
  
@@ -191,41 +191,18 @@ import (
 )
 
 // in this example we are using ants goroutine pool.
-wg := errors.NewWaitGroup(errors.WaitGroupWithStopOnError()) 
+wg := errors.NewWaitGroup(errors.WaitGroupWithStopOnError(), errors.WaitGroupWithContext(context.Background())) // you can pass your own context.
 
-ctx := wg.Context()
-
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient(ctx)
 })
 
-wg.Do(func() error {
+wg.Do(func(ctx context.Context) error {
     return callingHttpClient(ctx)
 })
  
 // if one of above task failed, context will cancel and other task will stop (the task must ba aware of context cancellation like http pkg do)
 
-if err := wg.Wait(); err != nil {
-    // oh, something bad happened in one of routines above.
-} 
-```
-**or you can use NewWaitGroupWithContext method:**
-```go
-import (
-    "github.com/mrsoftware/errors"
-)
-
-// in this example we are using ants goroutine pool.
-ctx, wg := errors.NewWaitGroupWithContext(context.Background(), errors.WaitGroupWithStopOnError()) 
-
-wg.Do(func() error {
-    return callingHttpClient(ctx)
-})
-
-wg.Do(func() error {
-    return callingHttpClient(ctx)
-})
- 
 if err := wg.Wait(); err != nil {
     // oh, something bad happened in one of routines above.
 } 

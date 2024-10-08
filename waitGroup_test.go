@@ -85,9 +85,9 @@ func TestGroup(t *testing.T) {
 
 		wg := NewWaitGroup()
 
-		wg.Do(context.Background(), func(ctx context.Context) error { return error1 })
+		wg.Do(func(ctx context.Context) error { return error1 })
 
-		wg.Do(context.Background(), func(ctx context.Context) error { return nil })
+		wg.Do(func(ctx context.Context) error { return nil })
 
 		err := wg.Wait()
 
@@ -100,7 +100,7 @@ func TestGroup(t *testing.T) {
 		limitCount := 1
 		wg := NewWaitGroup(WaitGroupWithTaskLimit(limitCount))
 
-		wg.Do(context.Background(), func(ctx context.Context) error {
+		wg.Do(func(ctx context.Context) error {
 			// wait for assertion to do.
 			time.Sleep(100 * time.Millisecond)
 			return nil
@@ -124,7 +124,7 @@ func TestGroup(t *testing.T) {
 
 		wg := NewWaitGroup(WaitGroupWithTaskRunner(runner))
 
-		wg.Do(context.Background(), func(ctx context.Context) error {
+		wg.Do(func(ctx context.Context) error {
 			return nil
 		})
 
@@ -138,10 +138,10 @@ func TestGroup(t *testing.T) {
 
 		wg := NewWaitGroup(WaitGroupWithStopOnError(), WaitGroupWithContext(context.Background()))
 
-		wg.Do(nil, func(ctx context.Context) error { return error1 })
+		wg.Do(func(ctx context.Context) error { return error1 })
 
 		// sample long-running and context aware task.
-		wg.Do(nil, func(ctx context.Context) error {
+		wg.Do(func(ctx context.Context) error {
 			for {
 				select {
 				case <-ctx.Done():
