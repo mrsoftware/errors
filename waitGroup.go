@@ -14,7 +14,6 @@ type WaitGroup struct {
 	ctx        context.Context
 	cancel     context.CancelCauseFunc
 	cancelOnce sync.Once
-	wait       chan struct{}
 }
 
 // NewWaitGroup create new WaitGroup.
@@ -36,7 +35,7 @@ func NewWaitGroup(options ...WaitGroupOption) *WaitGroup {
 
 	ctx, cancel := context.WithCancelCause(ops.Ctx)
 
-	return &WaitGroup{options: ops, gch: gch, ctx: ctx, cancel: cancel, wait: make(chan struct{})}
+	return &WaitGroup{options: ops, gch: gch, ctx: ctx, cancel: cancel}
 }
 
 // Context of current waitGroup.
@@ -55,21 +54,6 @@ func (g *WaitGroup) Wait() (err error) {
 
 	defer func() { g.Stop(err) }()
 
-	select {
-	case g.wait <- struct{}{}:
-	default:
-	}
-
-	return g.errors.Err()
-}
-
-// WaitChan is like Wait method but return chanel.
-func (g *WaitGroup) WaitChan() <-chan struct{} {
-	return g.wait
-}
-
-// Err of tasks.
-func (g *WaitGroup) Err() error {
 	return g.errors.Err()
 }
 
@@ -174,4 +158,13 @@ func WaitGroupWithContext(ctx context.Context) WaitGroupOption {
 	return func(g *WaitGroupOptions) {
 		g.Ctx = ctx
 	}
+}
+
+// WaitChanel turn WaitGroup Wait method into chanel.
+func WaitChanel(wg *WaitGroup) chan error {
+	wait := make(chan error)
+
+	go func() { wait <- wg.Wait() }()
+
+	return wait
 }

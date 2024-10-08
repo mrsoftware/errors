@@ -158,6 +158,48 @@ func TestGroup(t *testing.T) {
 	})
 }
 
+func TestWaitChanel(t *testing.T) {
+	t.Run("expect to turn wait into chanel and work", func(t *testing.T) {
+		wg := NewWaitGroup()
+
+		wg.Do(func(ctx context.Context) error {
+			return nil
+		})
+
+		wg.Do(func(ctx context.Context) error {
+			return nil
+		})
+
+		var err error
+		select {
+		case err = <-WaitChanel(wg):
+		}
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("expect to turn wait into chanel and get error (one task is failed)", func(t *testing.T) {
+		wg := NewWaitGroup()
+
+		internalErr := errors.New("some error")
+
+		wg.Do(func(ctx context.Context) error {
+			return nil
+		})
+
+		wg.Do(func(ctx context.Context) error {
+			return internalErr
+		})
+
+		var err error
+		select {
+		case err = <-WaitChanel(wg):
+		}
+
+		assert.Equal(t, NewMultiError(internalErr), err)
+	})
+}
+
 // all below test cases are copied from sync/waitgroup_test.go and transformed to group.
 
 func testWaitGroup(t *testing.T, wg1 *WaitGroup, wg2 *WaitGroup) {

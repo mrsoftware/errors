@@ -207,6 +207,34 @@ if err := wg.Wait(); err != nil {
     // oh, something bad happened in one of routines above.
 } 
 ```
+### Turn WaitGroup into a chanel
+```go
+import (
+    "github.com/mrsoftware/errors"
+)
+
+wg := errors.NewWaitGroup() 
+
+wg.Do(func(ctx context.Context) error {
+    return callingHttpClient()
+})
+
+wg.Do(func(ctx context.Context) error {
+    return callingHttpClient()
+})
+
+// this wait until receive something from chanel.
+var err error
+select {
+case err = <-errors.WaitChanel(wg):
+}
+
+if err != nil {
+    // oh, something bad happened in one of the routines above.
+} 
+
+```
+
 
 for mode details, check the [documentation](https://godoc.org/github.com/mrsoftware/errors)
 
